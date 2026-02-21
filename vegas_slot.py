@@ -97,7 +97,7 @@ while True:
             money -= 5
             result_text = "LOSE -$5"
 
-    result_until = now + 2.0  # keep message visible for 2 seconds
+        result_until = now + 2.0  # keep message visible for 2 seconds
 
 # choose what status to display
     if is_spinning:
@@ -105,7 +105,7 @@ while True:
     else:
         status_text = result_text if now < result_until else "PULL TO SPIN"
 
-        was_spinning = is_spinning
+    was_spinning = is_spinning
 
     # ---- UI overlay ----
     # Lever zone box
@@ -120,7 +120,7 @@ while True:
     # Money + status
     cv2.putText(frame, f"MONEY: ${money}", (30, 140),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 3)
-    cv2.putText(frame, result_text, (30, 200),
+    cv2.putText(frame, status_text, (30, 200),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 3)
 
     # Optional: show motion score for tuning

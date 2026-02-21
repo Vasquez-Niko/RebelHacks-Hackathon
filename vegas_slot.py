@@ -171,21 +171,32 @@ while True:
         if final_reels[0] == final_reels[1] == final_reels[2]:
             money += 50
             result_text = "JACKPOT +$50"
+            status_color = (0, 215, 255)  # gold
             jackpot_until = now + jackpot_flash_seconds
         elif len(set(final_reels)) == 2:
             money += 10
+            status_color = (0,255,0) #green
             result_text = "NICE +$10"
+            #status_color = (0,255,0) #green
         else:
             money -= 5
             result_text = "LOSE -$5"
+            status_color = (0, 0, 255) #red
 
         result_until = now + result_display_seconds
 
     # Status line logic
     if is_spinning:
         status_text = "SPINNING..."
+        status_color = (255, 255, 255)  # white
+
     else:
-        status_text = result_text if now < result_until else "PULL TO SPIN"
+        if now < result_until:
+            status_text = result_text
+            # keep previous status_color (green/red)
+        else:
+            status_text = "PULL TO SPIN"
+            status_color = (255, 255, 255)
 
     was_spinning = is_spinning  # must update every frame
 
@@ -211,7 +222,7 @@ while True:
     cv2.putText(frame, f"MONEY: ${money}", (30, 140),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 3)
     cv2.putText(frame, status_text, (30, 200),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 3)
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, status_color, 3)
 
     # Debug: motion score
     cv2.putText(frame, f"motion_score: {int(motion_score)}  motion_pixels: {motion_pixels}",

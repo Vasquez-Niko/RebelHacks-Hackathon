@@ -30,12 +30,18 @@ spin_duration = 1.2
 spinning_until = 0.0
 was_spinning = False
 
-result_text = "PULL TO SPIN"
-result_until = 0.0
 
 # Tune these:
 ROI_START = 0.7         # right 30% of screen is "lever zone"
-MOTION_THRESHOLD = 4000 # you already found this ballpark
+MOTION_THRESHOLD = 25000 # you already found this ballpark
+
+TOP_FRAC = 0.35        # top 25% of frame counts as "top"
+BOTTOM_FRAC = 0.70     # bottom 30% boundary for "bottom"
+MIN_MOTION_PIXELS = 1000  # require enough motion pixels // tune this
+PULL_TIMEOUT = 0.7     # seconds allowed to go top->bottom
+
+pull_state = "IDLE"    # IDLE -> ARMED -> (trigger) -> IDLE
+armed_time = 0.0
 
 while True:
     ret, frame = cap.read()
@@ -62,13 +68,48 @@ while True:
 
     motion_score = np.sum(thresh) / 255.0
 
+    # Motion mask centroid in ROI (thresh is ROI-sized already)
+    ys, xs = np.where(thresh > 0)
+    motion_pixels = len(xs)
+
+    centroid_y = None
+
+    if motion_pixels > 0:
+        centroid_y = float(np.mean(ys))  # 0 at top of ROI, increases downward
+
     now = time.time()
 
     # Trigger spin (cooldown + threshold)
-    if motion_score > MOTION_THRESHOLD and (now - last_spin_time) > cooldown_seconds and now >= spinning_until:
-        last_spin_time = now
-        spinning_until = now + spin_duration
-        final_reels = list(np.random.choice(symbols, size=3))
+    top_y = h * TOP_FRAC
+    bottom_y = h * BOTTOM_FRAC
+
+    can_spin = (now - last_spin_time) > cooldown_seconds and now >= spinning_until
+
+    if centroid_y is not None and motion_pixels > MIN_MOTION_PIXELS:
+        # Draw a dot showing detected motion center (optional)
+        cv2.circle(frame, (x0 + int(np.mean(xs)), int(centroid_y)), 8, (0, 255, 255), -1)
+
+        if pull_state == "IDLE":
+            # Arm only if motion starts near the TOP
+            if centroid_y < top_y:
+                pull_state = "ARMED"
+                armed_time = now
+
+        elif pull_state == "ARMED":
+            # If too slow, disarm
+            if (now - armed_time) > PULL_TIMEOUT:
+                pull_state = "IDLE"
+
+            # Trigger when centroid goes past BOTTOM (downwards)
+            elif centroid_y > bottom_y and can_spin:
+                last_spin_time = now
+                spinning_until = now + spin_duration
+                final_reels = list(np.random.choice(symbols, size=3))
+                pull_state = "IDLE"
+
+    else:
+        # No motion -> reset (prevents accidental arming)
+        pull_state = "IDLE"
 
     # Spin animation: randomize reels while spinning
     is_spinning = now < spinning_until
@@ -112,6 +153,11 @@ while True:
     cv2.rectangle(frame, (x0, 0), (w, h), (0, 255, 0), 2)
     cv2.putText(frame, "LEVER ZONE", (x0 + 10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    
+    cv2.line(frame, (x0, int(h * TOP_FRAC)), (w, int(h * TOP_FRAC)), (255, 255, 0), 2)
+    cv2.line(frame, (x0, int(h * BOTTOM_FRAC)), (w, int(h * BOTTOM_FRAC)), (255, 255, 0), 2)
+    cv2.putText(frame, f"state: {pull_state}", (x0 + 10, 60),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
     # Reels display
     cv2.putText(frame, f"{display_reels[0]} | {display_reels[1]} | {display_reels[2]}",
